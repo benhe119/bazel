@@ -110,6 +110,7 @@ import com.google.devtools.build.skydoc.rendering.UserDefinedFunctionInfo.Docstr
 import com.google.devtools.common.options.OptionsParser;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -150,6 +151,31 @@ public class SkydocMain {
   private final List<String> depRoots;
   private final String workspaceName;
 
+  private String getExecutionRoot() {
+    Path currentDir = Paths.get(".").toAbsolutePath();
+    boolean found = false;
+    while (true) {
+      if (Files.exists(currentDir.resolve("README"))) {
+        found = true;
+        break;
+      }
+      if (currentDir.getParent() == null) {
+        break;
+      }
+      currentDir = currentDir.getParent();
+    }
+
+    if (!found) {
+      throw new RuntimeException("A directory with README was not found");
+    }
+
+    if (!Files.exists(currentDir.resolve("external").resolve("bazel_tools"))) {
+      throw new RuntimeException("A directory with README does not contain external/bazel_tools");
+    }
+
+    return currentDir.toString();
+  }
+
   public SkydocMain(SkylarkFileAccessor fileAccessor, String workspaceName, List<String> depRoots) {
     this.fileAccessor = fileAccessor;
     this.workspaceName = workspaceName;
@@ -158,7 +184,10 @@ public class SkydocMain {
       // directory as the only root.
       this.depRoots = ImmutableList.of(".");
     } else {
-      this.depRoots = depRoots;
+      this.depRoots = new ImmutableList.Builder<String>()
+              .addAll(depRoots)
+              .add(getExecutionRoot())
+              .build();
     }
   }
 
